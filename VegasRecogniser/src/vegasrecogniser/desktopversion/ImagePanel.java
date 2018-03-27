@@ -1,38 +1,47 @@
 
 package vegasrecogniser.desktopversion;
 
-import org.opencv.core.Core;
-import org.opencv.core.CvType;
-import org.opencv.core.Mat;
+import java.awt.Graphics;
+import java.awt.image.BufferedImage;
 
-public class Recogniser
+import javax.swing.JPanel;
+
+public class ImagePanel extends JPanel
 	{
 
 	/*------------------------------------------------------------------*\
 	|*							Constructeurs							*|
 	\*------------------------------------------------------------------*/
 
+	public ImagePanel(BufferedImage bufferedImage)
+		{
+		/*
+
+		*/
+		this.image = bufferedImage;
+		}
+
 	/*------------------------------------------------------------------*\
 	|*							Methodes Public							*|
 	\*------------------------------------------------------------------*/
 
-
-	public static void main(String[] args)
+	public void setImage(BufferedImage bufferedImage)
 		{
-		main();
+		this.image = bufferedImage;
 		}
 
-	public static void main()
+	public BufferedImage getImage()
 		{
-		System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
-        Mat mat = Mat.eye(3, 3, CvType.CV_8UC1);
-        System.out.println("mat = " + mat.dump());
+		return image;
 		}
 
-	/*------------------------------------------------------------------*\
-	|*							Methodes Private						*|
-	\*------------------------------------------------------------------*/
-
+	@Override
+	protected void paintComponent(Graphics g)
+		{
+		super.paintComponent(g);
+		float ratio = (float)image.getWidth() / (float)image.getHeight();
+		g.drawImage(image, 0, 0, (int)(600 * ratio), 600, this); // see javadoc for more info on the parameters
+		}
 
 	/*------------------------------*\
 	|*				Set				*|
@@ -49,5 +58,7 @@ public class Recogniser
 	/*------------------------------------------------------------------*\
 	|*							Attributs Private						*|
 	\*------------------------------------------------------------------*/
-	}
 
+	private BufferedImage image;
+
+	}
