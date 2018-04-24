@@ -28,8 +28,10 @@ public class Recogniser
 		listRect = new LinkedList<Rect>();
 		listPoint = new LinkedList<Point>();
 		listMatNumber = new LinkedList<Mat>();
+		listMatSymbol = new LinkedList<Mat>();
 
 		loadImgNumber();
+		loadImgSymbol();
 		}
 
 	/*------------------------------------------------------------------*\
@@ -38,14 +40,14 @@ public class Recogniser
 
 	public Mat work(Mat mat)
 		{
-//		searchRect(mat);
-//		searchAngle(mat);
-//
-//		detectSymbol();
-//		detectNumber(mat);
+		searchRect(mat);
+		searchAngle(mat);
 
-		//drawRect(mat);
-		binaryImage(mat);
+		detectSymbol(mat);
+		detectNumber(mat);
+
+		drawRect(mat);
+		//binaryImage(mat);
 		return mat;
 		}
 
@@ -61,18 +63,22 @@ public class Recogniser
 			}
 	}
 
+	private void loadImgSymbol()
+	{
+		for(char letter:Constant.TABCOLORFORM)
+			{
+			listMatSymbol.add(Imgcodecs.imread("resources/symbol/" + letter+".jpg",-1));
+			System.out.println(letter);
+			}
+	}
+
 	private void drawRect(Mat mat)
 		{
-
-		for(Point point:listPoint)
-			{
-			Imgproc.circle(mat, point, 10, new Scalar(0, 0, 255, 255), 1, 8, 0);
-			}
-
+		System.out.println(listRect.size());
 		for(Rect rect:listRect)
 			{
 
-			Imgproc.rectangle(mat, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(255, 0, 0, 255), 5);
+			Imgproc.rectangle(mat, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(255, 0, 0, 255), 10);
 			}
 		}
 
@@ -83,8 +89,8 @@ public class Recogniser
 
 		binaryImage(mat1);
 		listRect = getListRect(mat1);
-		System.out.println(listRect.size());
-		//deleteMaxRect(listRect);
+
+		deleteMaxRect(listRect);
 		searchGoodRecangle(listRectOut, mat1, listRect);
 		listRect = listRectOut;
 
@@ -115,8 +121,8 @@ public class Recogniser
 	Rect rect = listRect.get(0);
 	Mat subMat=mat.submat(rect.y, rect.y+rect.height, rect.x, rect.x+rect.width);
 
-	Mat matResized=new Mat(110, 65, subMat.type());
-	Imgproc.resize(subMat, matResized, new Size(65, 110));
+	Mat matResized=new Mat(listMatNumber.get(0).rows(), listMatNumber.get(0).cols(), subMat.type());
+	Imgproc.resize(subMat, matResized, new Size(listMatNumber.get(0).cols(), listMatNumber.get(0).rows()));
 
 	double minVal = Double.MAX_VALUE;
 	int index=0;
@@ -137,44 +143,45 @@ public class Recogniser
 			}
 		}
 	number=Constant.TABNUMBER[index-1];
-	System.out.println(number);
+
 	}
 
 	/**
 	 * Detect the symbol of the card
 	 */
-	private void detectSymbol()
+	private void detectSymbol(Mat mat)
 		{
-		List<Point> listForm = new LinkedList<Point>();
-		for(Point point:listPoint)
+		int methode  = Imgproc.TM_SQDIFF;
+		Mat mat1 = mat.clone();
+
+		binaryImage(mat1);
+
+		Rect rect = listRect.get(1);
+		Mat subMat=mat.submat(rect.y, rect.y+rect.height, rect.x, rect.x+rect.width);
+
+		Mat matResized=new Mat(listMatSymbol.get(0).rows(), listMatSymbol.get(0).cols(), subMat.type());
+		Imgproc.resize(subMat, matResized, new Size(listMatSymbol.get(0).cols(), listMatSymbol.get(0).rows()));
+
+		double minVal = Double.MAX_VALUE;
+		int index=0;
+		int i=0;
+
+		for(Mat mat2:listMatSymbol)
 			{
-			if (point.inside(listRect.get(1)))
+			i++;
+
+			Mat matResult = new Mat(1, 1, mat.type());
+			Imgproc.matchTemplate(matResized, mat2, matResult, methode);
+			MinMaxLocResult resMinMax = Core.minMaxLoc(matResult);
+
+			if(resMinMax.minVal<minVal)
 				{
-				listForm.add(point);
+				minVal=resMinMax.minVal;
+				index=i;
 				}
 			}
-		listForm.sort((p1, p2) -> Double.compare(p1.y, p2.y));
-		int nbAngle = listForm.size();
-		System.out.println(nbAngle);
-		if (nbAngle == 6)
-			{
-			symbol = Symbol.CLUB.getName();
-			}
-		else if (nbAngle == 5)
-			{
-			symbol = Symbol.SPADE.getName();
-			}
-		else if (nbAngle == 2)
-			{
-			if (Math.abs(listForm.get(0).y - listRect.get(1).y) < 5)
-				{
-				symbol = Symbol.DIAMOND.getName();
-				}
-			else
-				{
-				symbol = Symbol.HEART.getName();
-				}
-			}
+		System.out.println(index);
+		symbol=Constant.TABSYMBOL[index-1];
 		}
 
 	/**
@@ -329,7 +336,7 @@ public class Recogniser
 		{
 		Mat mat2 = new Mat(mat.height(), mat.width(), mat.type());
 
-		System.out.println(mat.type());
+
 
 
 		//Level of gray
@@ -338,7 +345,7 @@ public class Recogniser
 		//Binary image
 		Imgproc.threshold(mat2, mat, 100, 255, Imgproc.THRESH_BINARY);
 
-		System.out.println(mat.type());
+
 		}
 
 	/*------------------------------*\
@@ -370,6 +377,8 @@ public class Recogniser
 	private List<Rect> listRect;
 	private List<Point> listPoint;
 	private List<Mat> listMatNumber;
+	private List<Mat> listMatSymbol;
+
 
 	private String symbol;
 	private String number;

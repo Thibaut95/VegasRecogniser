@@ -166,7 +166,7 @@ public class MainJFrame extends JFrame
 	private void startSearch()
 	{
 	Mat mat = Tools.convertToMat(panelInput.getImage());
-	Mat mat2 = Imgcodecs.imread("resources/cards/7.jpg",-1).t();
+	Mat mat2 = Imgcodecs.imread("resources/cards/3.jpg",-1).t();
 	Mat mat3 = mat2.clone();
 	Core.flip(mat2, mat3, 1);
 	panelOutput.setImage(Tools.convertToBufferedImage(recogniser.work(mat3)));
