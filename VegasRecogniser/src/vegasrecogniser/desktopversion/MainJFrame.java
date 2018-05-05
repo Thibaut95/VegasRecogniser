@@ -10,6 +10,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.util.LinkedList;
+import java.util.List;
 
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
@@ -21,6 +23,7 @@ import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.imgcodecs.Imgcodecs;
 
+import vegasrecogniser.imageporcessing.Card;
 import vegasrecogniser.imageporcessing.Constant;
 import vegasrecogniser.imageporcessing.Recogniser;
 import vegasrecogniser.imageporcessing.Tools;
@@ -64,10 +67,19 @@ public class MainJFrame extends JFrame
 
 	private void createPanel()
 		{
-		BufferedImage bufferedImage = Tools.loadFromFile("resources/cards/c01.png");
+		Mat mat2 = Imgcodecs.imread("resources/cards/hand3.jpg",-1).t();
+		Mat mat3 = mat2.clone();
+		Core.flip(mat2, mat3, 1);
 
-		panelInput = new ImagePanel(bufferedImage);
-		panelOutput = new ImagePanel(bufferedImage);
+		BufferedImage bufferedImage=Tools.convertToBufferedImage(mat3);
+
+		panelInput = new ImagePanel(bufferedImage,600);
+		panelOutput = new LinkedList<ImagePanel>();
+		for(int i = 1; i <= n; i++)
+			{
+			ImagePanel panel = new ImagePanel(new BufferedImage(bufferedImage.getWidth(), bufferedImage.getHeight(), bufferedImage.getType()),250);
+			panelOutput.add(panel);
+			}
 		}
 
 	private void apparence()
@@ -150,14 +162,22 @@ public class MainJFrame extends JFrame
 		setLayout(new BorderLayout());
 
 		JPanel southPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-		southPanel.add(labelSymbol);
+
 		southPanel.add(buttonLoad);
 		southPanel.add(buttonStart);
 		southPanel.add(buttonNext);
 
 		JPanel centerPanel = new JPanel(new GridLayout());
 		centerPanel.add(panelInput);
-		centerPanel.add(panelOutput);
+
+		JPanel cardsPanel = new JPanel(new GridLayout(0, 3));
+		for(ImagePanel imagePanel:panelOutput)
+			{
+			cardsPanel.add(imagePanel);
+			}
+
+
+		centerPanel.add(cardsPanel);
 
 		add(centerPanel, BorderLayout.CENTER);
 		add(southPanel, BorderLayout.SOUTH);
@@ -165,15 +185,29 @@ public class MainJFrame extends JFrame
 
 	private void startSearch()
 	{
-	Mat mat = Tools.convertToMat(panelInput.getImage());
-	Mat mat2 = Imgcodecs.imread("resources/cards/3.jpg",-1).t();
+
+	Mat mat2 = Imgcodecs.imread("resources/cards/hand3.jpg",-1).t();
 	Mat mat3 = mat2.clone();
 	Core.flip(mat2, mat3, 1);
-	panelOutput.setImage(Tools.convertToBufferedImage(recogniser.work(mat3)));
-	//panelOutput.setImage(Tools.convertToBufferedImage(mat3));
+
+	panelInput.setImage(Tools.convertToBufferedImage(mat3));
+	panelInput.repaint();
+
+	List<Card> listCard=recogniser.work(mat3);
+
+	int i=0;
+	for(ImagePanel panel:panelOutput)
+		{
+		panel.setImage(Tools.convertToBufferedImage(listCard.get(i).getMat()));
+		panel.setText(listCard.get(i).getNumber()+" of "+listCard.get(i).getSymbol());
+		i++;
+		panel.repaint();
+		}
+
+
 	getContentPane();
 	labelSymbol.setText(recogniser.getNumber() + " of " +recogniser.getSymbol());
-	panelOutput.repaint();
+
 	}
 
 	/*------------------------------------------------------------------*\
@@ -187,11 +221,12 @@ public class MainJFrame extends JFrame
 	JLabel labelSymbol;
 
 	ImagePanel panelInput;
-	ImagePanel panelOutput;
+	List<ImagePanel> panelOutput;
 
 	Recogniser recogniser;
 
 	int nbColor = 0;
 	int nbCard = 1;
+	int n=7;
 
 	}

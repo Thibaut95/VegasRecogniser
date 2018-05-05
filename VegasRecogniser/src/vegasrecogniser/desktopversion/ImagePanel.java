@@ -13,12 +13,18 @@ public class ImagePanel extends JPanel
 	|*							Constructeurs							*|
 	\*------------------------------------------------------------------*/
 
-	public ImagePanel(BufferedImage bufferedImage)
+	public ImagePanel(BufferedImage bufferedImage, int height)
 		{
-		/*
-
-		*/
+		this.text="";
 		this.image = bufferedImage;
+		this.height=height;
+		}
+
+	public ImagePanel(BufferedImage bufferedImage, int height, String text)
+		{
+		this.text=text;
+		this.image = bufferedImage;
+		this.height=height;
 		}
 
 	/*------------------------------------------------------------------*\
@@ -30,6 +36,11 @@ public class ImagePanel extends JPanel
 		this.image = bufferedImage;
 		}
 
+	public void setText(String text)
+	{
+	this.text=text;
+	}
+
 	public BufferedImage getImage()
 		{
 		return image;
@@ -40,7 +51,8 @@ public class ImagePanel extends JPanel
 		{
 		super.paintComponent(g);
 		float ratio = (float)image.getWidth() / (float)image.getHeight();
-		g.drawImage(image, 0, 0, (int)(600 * ratio), 600, this); // see javadoc for more info on the parameters
+		g.drawImage(image, 0, 0, (int)(height * ratio), height, this); // see javadoc for more info on the parameters
+		g.drawString(text, 10, height+20);
 		}
 
 	/*------------------------------*\
@@ -60,5 +72,7 @@ public class ImagePanel extends JPanel
 	\*------------------------------------------------------------------*/
 
 	private BufferedImage image;
+	private int height;
+	private String text="";
 
 	}

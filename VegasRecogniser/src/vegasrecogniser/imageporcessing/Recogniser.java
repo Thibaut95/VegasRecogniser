@@ -9,8 +9,10 @@ import org.opencv.core.Core;
 import org.opencv.core.Core.MinMaxLocResult;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
+import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
+import org.opencv.core.RotatedRect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgcodecs.Imgcodecs;
@@ -26,6 +28,7 @@ public class Recogniser
 	public Recogniser()
 		{
 		listRect = new LinkedList<Rect>();
+		listRectCard = new LinkedList<Rect>();
 		listPoint = new LinkedList<Point>();
 		listMatNumber = new LinkedList<Mat>();
 		listMatSymbol = new LinkedList<Mat>();
@@ -38,56 +41,189 @@ public class Recogniser
 	|*							Methodes Public							*|
 	\*------------------------------------------------------------------*/
 
-	public Mat work(Mat mat)
+	public List<Card> work(Mat mat)
 		{
-		searchRect(mat);
-		searchAngle(mat);
+		List<Card> listCard = new LinkedList<Card>();
 
-		detectSymbol(mat);
-		detectNumber(mat);
+		searchRectCard(mat);
+		List<Mat> listMatCard=getCard(mat);
+		for(Mat matCard:listMatCard)
+			{
 
-		drawRect(mat);
-		//binaryImage(mat);
-		return mat;
+			List<RotatedRect> listRotRect=getCardStraight(matCard);
+
+			int angleAdd = 0;
+			if(listRotRect.get(0).size.width<listRotRect.get(0).size.height)
+				{
+				angleAdd=90;
+				}
+
+			Mat mat2 = new Mat(matCard.height(), matCard.width(), matCard.type());
+			Mat rotation=Imgproc.getRotationMatrix2D(new Point(listRotRect.get(0).center.x,listRotRect.get(0).center.y), listRotRect.get(0).angle-angleAdd, 1);
+			Imgproc.warpAffine(matCard, mat2, rotation, new Size(matCard.size().width,matCard.size().height));
+
+//			//searchRectCardStraigth(mat2);
+
+//			if(angleAdd==90)
+//				{
+//				Point point = new Point(listRotRect.get(0).center.x-listRotRect.get(0).size.height/2,listRotRect.get(0).center.y-listRotRect.get(0).size.width/2);
+//				mat=mat2.submat(new Rect(point,new Size(listRotRect.get(0).size.height,listRotRect.get(0).size.width)));
+//				}
+//			else
+//				{
+//				Point point = new Point(listRotRect.get(0).center.x-listRotRect.get(0).size.width/2,listRotRect.get(0).center.y-listRotRect.get(0).size.height/2);
+//				mat=mat2.submat(new Rect(point,listRotRect.get(0).size));
+//				}
+
+			Mat mat3 = new Mat(matCard.height(), matCard.width(), matCard.type());
+			Core.rotate(mat2, mat3, Core.ROTATE_90_CLOCKWISE);
+
+
+			searchRect(mat3);
+
+			detectSymbol(mat3);
+			detectNumber(mat3);
+			drawRect(mat3, listRect);
+
+			//binaryImage(mat2,treshDetectSmybol);
+			Card card = new Card(symbol, number, mat3);
+			listCard.add(card);
+
+
+			//binaryImage(mat);
+			}
+
+		return listCard;
 		}
 
 	/*------------------------------------------------------------------*\
 	|*							Methodes Private						*|
 	\*------------------------------------------------------------------*/
 
-	private void loadImgNumber()
+	private void drawRotRect(Mat matCard, List<RotatedRect> listRotRect)
+		{
+		for(RotatedRect rotatedRect:listRotRect)
+			{
+			Point points[] = new Point[4];
+			rotatedRect.points(points);
+		    for(int i=0; i<4; ++i){
+		        Imgproc.line(matCard, points[i], points[(i+1)%4],  new Scalar(255, 0, 0, 255),10);
+
+			}
+
+	    }
+
+		}
+
+	private List<RotatedRect> getCardStraight(Mat mat)
+		{
+		Mat mat1 = mat.clone();
+
+
+		binaryImage(mat1,treshSeparateCard);
+		Mat mat2 = new Mat(mat.height(), mat.width(), mat.type());
+
+		//Inversion
+		Core.bitwise_not(mat1, mat2);
+
+		final List<MatOfPoint> points = new ArrayList<>();
+		final Mat hierarchy = new Mat();
+		Imgproc.findContours(mat2, points, hierarchy, Imgproc.RETR_TREE, Imgproc.CHAIN_APPROX_SIMPLE);
+
+//		Core.repeat(mat2, 1, 1, mat);
+
+		List<RotatedRect> listRectRot = new LinkedList<RotatedRect>();
+		for(MatOfPoint matOfPoint:points)
+			{
+			RotatedRect rect = Imgproc.minAreaRect(new MatOfPoint2f(matOfPoint.toArray()));
+			listRectRot.add(rect);
+			}
+
+		listRectRot.sort((rect1, rect2) -> Double.compare(rect1.size.height, rect2.size.height)*-1);
+		listRectRot.remove(0);
+
+
+		return listRectRot.subList(0, 1);
+
+		}
+
+	private List<Mat> getCard(Mat mat)
 	{
+		List<Mat> listMatCard= new LinkedList<Mat>();
+		for(Rect rect:listRectCard)
+			{
+				listMatCard.add(mat.submat(rect));
+			}
+		return listMatCard;
+		//return mat;
+	}
+
+	private void loadImgNumber()
+		{
 		for(int i = 1; i <= 13; i++)
 			{
-			listMatNumber.add(Imgcodecs.imread("resources/number/" + i+".jpg",-1));
+			listMatNumber.add(Imgcodecs.imread("resources/number/" + i + ".jpg", -1));
 			}
-	}
+		}
 
 	private void loadImgSymbol()
-	{
+		{
 		for(char letter:Constant.TABCOLORFORM)
 			{
-			listMatSymbol.add(Imgcodecs.imread("resources/symbol/" + letter+".jpg",-1));
+			listMatSymbol.add(Imgcodecs.imread("resources/symbol/" + letter + ".jpg", -1));
 			System.out.println(letter);
 			}
-	}
+		}
 
-	private void drawRect(Mat mat)
+	private void drawRect(Mat mat, List<Rect> listRect)
 		{
 		System.out.println(listRect.size());
 		for(Rect rect:listRect)
 			{
-
 			Imgproc.rectangle(mat, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(255, 0, 0, 255), 10);
 			}
 		}
+
+	private Mat searchRectCard(Mat mat)
+		{
+		Mat mat1 = mat.clone();
+		List<Rect> listRectOut = new LinkedList<Rect>();
+
+		binaryImage(mat1,treshSeparateCard);
+		listRectCard = getListRect(mat1);
+
+		deleteMaxRect(listRectCard, 1);
+		deleteRectInside(listRectOut, listRectCard, 7);
+
+		listRectCard = listRectOut;
+
+		return mat1;
+		}
+
+	private Mat searchRectCardStraigth(Mat mat)
+		{
+		Mat mat1 = mat.clone();
+		List<Rect> listRectOut = new LinkedList<Rect>();
+
+		binaryImage(mat1,treshSeparateCard);
+		listRectCard = getListRect(mat1);
+
+		//deleteMaxRect(listRectCard, 1);
+		//deleteRectInside(listRectOut, listRectCard, 5);
+
+		//listRectCard = listRectOut;
+
+		return mat1;
+		}
+
+
 
 	private Mat searchRect(Mat mat)
 		{
 		Mat mat1 = mat.clone();
 		List<Rect> listRectOut = new LinkedList<Rect>();
 
-		binaryImage(mat1);
+		binaryImage(mat1,treshDetectSmybol);
 		listRect = getListRect(mat1);
 
 		deleteMaxRect(listRect);
@@ -101,7 +237,7 @@ public class Recogniser
 		{
 		Mat mat1 = mat.clone();
 
-		binaryImage(mat1);
+		binaryImage(mat1,treshDetectSmybol);
 		detectCorner(mat1);
 		listPoint = searchPointPosition(mat1);
 
@@ -112,59 +248,59 @@ public class Recogniser
 	 * Detect the number of the card
 	 */
 	private void detectNumber(Mat mat)
-	{
-	int methode  = Imgproc.TM_SQDIFF;
-	Mat mat1 = mat.clone();
-
-	binaryImage(mat1);
-
-	Rect rect = listRect.get(0);
-	Mat subMat=mat.submat(rect.y, rect.y+rect.height, rect.x, rect.x+rect.width);
-
-	Mat matResized=new Mat(listMatNumber.get(0).rows(), listMatNumber.get(0).cols(), subMat.type());
-	Imgproc.resize(subMat, matResized, new Size(listMatNumber.get(0).cols(), listMatNumber.get(0).rows()));
-
-	double minVal = Double.MAX_VALUE;
-	int index=0;
-	int i=0;
-
-	for(Mat mat2:listMatNumber)
 		{
-		i++;
+		int methode = Imgproc.TM_SQDIFF;
+		Mat mat1 = mat.clone();
 
-		Mat matResult = new Mat(1, 1, mat.type());
-		Imgproc.matchTemplate(matResized, mat2, matResult, methode);
-		MinMaxLocResult resMinMax = Core.minMaxLoc(matResult);
+		binaryImage(mat1,treshDetectSmybol);
 
-		if(resMinMax.minVal<minVal)
+		Rect rect = listRect.get(0);
+		Mat subMat = mat.submat(rect.y, rect.y + rect.height, rect.x, rect.x + rect.width);
+
+		Mat matResized = new Mat(listMatNumber.get(0).rows(), listMatNumber.get(0).cols(), subMat.type());
+		Imgproc.resize(subMat, matResized, new Size(listMatNumber.get(0).cols(), listMatNumber.get(0).rows()));
+
+		double minVal = Double.MAX_VALUE;
+		int index = 0;
+		int i = 0;
+
+		for(Mat mat2:listMatNumber)
 			{
-			minVal=resMinMax.minVal;
-			index=i;
-			}
-		}
-	number=Constant.TABNUMBER[index-1];
+			i++;
 
-	}
+			Mat matResult = new Mat(1, 1, mat.type());
+			Imgproc.matchTemplate(matResized, mat2, matResult, methode);
+			MinMaxLocResult resMinMax = Core.minMaxLoc(matResult);
+
+			if (resMinMax.minVal < minVal)
+				{
+				minVal = resMinMax.minVal;
+				index = i;
+				}
+			}
+		number = Constant.TABNUMBER[index - 1];
+
+		}
 
 	/**
 	 * Detect the symbol of the card
 	 */
 	private void detectSymbol(Mat mat)
 		{
-		int methode  = Imgproc.TM_SQDIFF;
+		int methode = Imgproc.TM_SQDIFF;
 		Mat mat1 = mat.clone();
 
-		binaryImage(mat1);
+		binaryImage(mat1,treshDetectSmybol);
 
 		Rect rect = listRect.get(1);
-		Mat subMat=mat.submat(rect.y, rect.y+rect.height, rect.x, rect.x+rect.width);
+		Mat subMat = mat.submat(rect.y, rect.y + rect.height, rect.x, rect.x + rect.width);
 
-		Mat matResized=new Mat(listMatSymbol.get(0).rows(), listMatSymbol.get(0).cols(), subMat.type());
+		Mat matResized = new Mat(listMatSymbol.get(0).rows(), listMatSymbol.get(0).cols(), subMat.type());
 		Imgproc.resize(subMat, matResized, new Size(listMatSymbol.get(0).cols(), listMatSymbol.get(0).rows()));
 
 		double minVal = Double.MAX_VALUE;
-		int index=0;
-		int i=0;
+		int index = 0;
+		int i = 0;
 
 		for(Mat mat2:listMatSymbol)
 			{
@@ -174,14 +310,14 @@ public class Recogniser
 			Imgproc.matchTemplate(matResized, mat2, matResult, methode);
 			MinMaxLocResult resMinMax = Core.minMaxLoc(matResult);
 
-			if(resMinMax.minVal<minVal)
+			if (resMinMax.minVal < minVal)
 				{
-				minVal=resMinMax.minVal;
-				index=i;
+				minVal = resMinMax.minVal;
+				index = i;
 				}
 			}
 		System.out.println(index);
-		symbol=Constant.TABSYMBOL[index-1];
+		symbol = Constant.TABSYMBOL[index - 1];
 		}
 
 	/**
@@ -248,6 +384,13 @@ public class Recogniser
 		Imgproc.threshold(mat2, mat1, thresh, 255, Imgproc.THRESH_BINARY);
 		}
 
+	private void deleteRectInside(List<Rect> listRectOut, List<Rect> listRect, int nbRect)
+		{
+		listRect.sort((rect1, rect2) -> Integer.compare(rect1.height, rect2.height)*-1);
+		listRectOut.addAll(listRect.subList(0, nbRect));
+
+		}
+
 	/**
 	 * Search two rectangle that contain the number and th symbol of the card
 	 * @param listRectOut
@@ -256,17 +399,27 @@ public class Recogniser
 	 */
 	private void searchGoodRecangle(List<Rect> listRectOut, Mat mat1, List<Rect> listRect)
 		{
+		searchGoodRecangle(listRectOut, mat1, listRect, 10);
+		}
+
+	private void searchGoodRecangle(List<Rect> listRectOut, Mat mat1, List<Rect> listRect, int minWidth)
+		{
+		//listRect.sort((rect1, rect2) -> Integer.compare(rect1.y, rect2.y));
 		listRect.sort((rect1, rect2) -> Integer.compare(rect1.x, rect2.x));
+
 
 		int j = 0;
 		for(Rect rect:listRect)
 			{
-			listRectOut.add(rect);
 			//Imgproc.rectangle(mat1, new Point(rect.x, rect.y), new Point(rect.x + rect.width, rect.y + rect.height), new Scalar(255, 255, 255, 255), 2);
 			j++;
-			if(rect.width<10)
+			if (rect.width < minWidth || rect.height < minWidth || rect.x<minWidth)
 				{
 				j--;
+				}
+			else
+				{
+				listRectOut.add(rect);
 				}
 			if (j == 2)
 				{
@@ -283,7 +436,12 @@ public class Recogniser
 	 */
 	private void deleteMaxRect(List<Rect> listRect)
 		{
-		for(int j = 0; j < 2; j++)
+		deleteMaxRect(listRect, 2);
+		}
+
+	private void deleteMaxRect(List<Rect> listRect, int nbRect)
+		{
+		for(int j = 0; j < nbRect; j++)
 			{
 			int maxHeight = 0;
 			Rect rectToDelete = null;
@@ -315,7 +473,7 @@ public class Recogniser
 		final Mat hierarchy = new Mat();
 		Imgproc.findContours(mat2, points, hierarchy, Imgproc.RETR_TREE, Imgproc.CHAIN_APPROX_SIMPLE);
 
-		Core.repeat(mat2, 1, 1, mat);
+		//Core.repeat(mat2, 1, 1, mat);
 
 		List<Rect> listRect = new LinkedList<Rect>();
 		for(MatOfPoint matOfPoint:points)
@@ -332,19 +490,15 @@ public class Recogniser
 	 * @param mat
 	 * @return
 	 */
-	private void binaryImage(Mat mat)
+	private void binaryImage(Mat mat, int tresh)
 		{
 		Mat mat2 = new Mat(mat.height(), mat.width(), mat.type());
-
-
-
 
 		//Level of gray
 		Imgproc.cvtColor(mat, mat2, Imgproc.COLOR_BGR2GRAY);
 
 		//Binary image
-		Imgproc.threshold(mat2, mat, 100, 255, Imgproc.THRESH_BINARY);
-
+		Imgproc.threshold(mat2, mat, tresh, 255, Imgproc.THRESH_BINARY);
 
 		}
 
@@ -375,12 +529,15 @@ public class Recogniser
 	\*------------------------------------------------------------------*/
 
 	private List<Rect> listRect;
+	private List<Rect> listRectCard;
 	private List<Point> listPoint;
 	private List<Mat> listMatNumber;
 	private List<Mat> listMatSymbol;
 
-
 	private String symbol;
 	private String number;
+
+	private int treshSeparateCard=100;
+	private int treshDetectSmybol=150;
 
 	}
